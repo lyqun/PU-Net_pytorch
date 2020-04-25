@@ -15,7 +15,7 @@ import argparse
 import numpy as np
 
 parser = argparse.ArgumentParser(description="Arg parser")
-parser.add_argument('--gpu', type=int, default=4, help='GPU to use')
+parser.add_argument('--gpu', type=int, default=0, help='GPU to use')
 parser.add_argument('--log_dir', default='logs/test_log', help='Log dir [default: logs/test_log]')
 parser.add_argument('--npoint', type=int, default=1024,help='Point Number [1024/2048] [default: 1024]')
 parser.add_argument('--up_ratio',  type=int,  default=4, help='Upsampling Ratio [default: 4]')
@@ -106,3 +106,7 @@ if __name__ == '__main__':
 
             loss_list.append(loss.item())
         print(' -- epoch {}, loss {}.'.format(epoch, np.mean(loss_list)))
+        if (epoch + 1) % 20 == 0:
+            state = {'epoch': epoch, 'model_state': model.state_dict()}
+            save_path = os.path.join(args.log_dir, 'punet_epoch_{}.pth'.format(epoch))
+            torch.save(state, save_path)

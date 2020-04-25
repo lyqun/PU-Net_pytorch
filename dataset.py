@@ -2,7 +2,23 @@ import torch.utils.data as torch_data
 import h5py
 import numpy as np
 import utils
+from glob import glob
+import os
 
+class PUNET_Dataset_Whole(torch_data.Dataset):
+    def __init__(self, data_dir='./datas/test_data/our_collected_data/MC_5k'):
+        super().__init__()
+
+        file_list = os.listdir(data_dir)
+        self.names = [x.split('.')[0] for x in file_list]
+        self.sample_path = [os.path.join(data_dir, x) for x in file_list]
+
+    def __len__(self):
+        return len(self.names)
+
+    def __getitem__(self, index):
+        points = np.loadtxt(self.sample_path[index])
+        return points
 
 class PUNET_Dataset(torch_data.Dataset):
     def __init__(self, h5_file_path='./datas/Patches_noHole_and_collected.h5', 
@@ -66,7 +82,10 @@ class PUNET_Dataset(torch_data.Dataset):
 
             
 if __name__ == '__main__':
-    dst = PUNET_Dataset()
-    for batch in dst:
-        pcd, gt, r = batch
-        print(pcd.shape)
+    # dst = PUNET_Dataset()
+    # for batch in dst:
+    #     pcd, gt, r = batch
+    #     print(pcd.shape)
+    dst = PUNET_Dataset_Whole()
+    points, name = dst[0]
+    print(points, name)

@@ -16,7 +16,7 @@ class _PointnetSAModuleBase(nn.Module):
         self.mlps = None
         self.pool_method = 'max_pool'
 
-    def forward(self, xyz: torch.Tensor, features: torch.Tensor = None, new_xyz=None) -> (torch.Tensor, torch.Tensor):
+    def forward(self, xyz: torch.Tensor, features: torch.Tensor = None, npoint=None, new_xyz=None) -> (torch.Tensor, torch.Tensor):
         """
         :param xyz: (B, N, 3) tensor of the xyz coordinates of the features
         :param features: (B, N, C) tensor of the descriptors of the the features
@@ -25,6 +25,8 @@ class _PointnetSAModuleBase(nn.Module):
             new_xyz: (B, npoint, 3) tensor of the new features' xyz
             new_features: (B, npoint, \sum_k(mlps[k][-1])) tensor of the new_features descriptors
         """
+        if npoint is not None:
+            self.npoint = npoint
         new_features_list = []
 
         xyz_flipped = xyz.transpose(1, 2).contiguous()

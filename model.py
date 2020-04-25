@@ -11,7 +11,7 @@ class PUNet(nn.Module):
         self.use_normal = use_normal
         self.up_ratio = up_ratio
 
-        npoints = [
+        self.npoints = [
             npoint, 
             npoint // 2, 
             npoint // 4, 
@@ -32,10 +32,10 @@ class PUNet(nn.Module):
         ## for 4 downsample layers
         in_ch = 0 if not use_normal else 3
         self.SA_modules = nn.ModuleList()
-        for k in range(len(npoints)):
+        for k in range(len(self.npoints)):
             self.SA_modules.append(
                 PointnetSAModule(
-                    npoint=npoints[k],
+                    npoint=self.npoints[k],
                     radius=radius[k],
                     nsample=nsamples[k],
                     mlp=[in_ch] + mlps[k],
@@ -45,14 +45,14 @@ class PUNet(nn.Module):
 
         ## upsamples for layer 2 ~ 4
         self.FP_Modules = nn.ModuleList()
-        for k in range(len(npoints) - 1):
+        for k in range(len(self.npoints) - 1):
             self.FP_Modules.append(
                 PointnetFPModule(
                     mlp=[mlps[k + 1][-1], 64], 
                     bn=use_bn))
         
         ## feature Expansion
-        in_ch = len(npoints) * 64 + 3 # 4 layers + input xyz
+        in_ch = len(self.npoints) * 64 + 3 # 4 layers + input xyz
         self.FC_Modules = nn.ModuleList()
         for k in range(up_ratio):
             self.FC_Modules.append(
@@ -67,7 +67,14 @@ class PUNet(nn.Module):
             pt_utils.SharedMLP([64, 3], activation=None, bn=False)) 
 
 
-    def forward(self, points):
+    def forward(self, points, npoint=None):
+        if npoint is None:
+            npoints = [None] * len(self.npoints)
+        else:
+            npoints = [npoint]
+            for k in range(len(self.npoints) - 1):
+                npoints.append(npoint // 2 ** k)
+
         ## points: bs, N, 3/6
         xyz = points[..., :3].contiguous()
         feats = points[..., 3:].transpose(1, 2).contiguous() \
@@ -76,7 +83,7 @@ class PUNet(nn.Module):
         ## downsample
         l_xyz, l_feats = [xyz], [feats]
         for k in range(len(self.SA_modules)):
-            lk_xyz, lk_feats = self.SA_modules[k](l_xyz[k], l_feats[k])
+            lk_xyz, lk_feats = self.SA_modules[k](l_xyz[k], l_feats[k], npoint=npoints[k])
             l_xyz.append(lk_xyz)
             l_feats.append(lk_feats)
 
