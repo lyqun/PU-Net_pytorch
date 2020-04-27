@@ -44,7 +44,7 @@ class PUNET_Dataset(torch_data.Dataset):
             self.radius = np.ones(shape=(len(self.input)))
             self.gt[..., :3] -= centroid
             self.gt[..., :3] /= np.expand_dims(furthest_distance, axis=-1)
-            self.input[..., :3] -= - centroid
+            self.input[..., :3] -= centroid
             self.input[..., :3] /= np.expand_dims(furthest_distance, axis=-1)
 
         self.input = self.input[::skip_rate]
@@ -82,10 +82,12 @@ class PUNET_Dataset(torch_data.Dataset):
 
             
 if __name__ == '__main__':
-    # dst = PUNET_Dataset()
-    # for batch in dst:
-    #     pcd, gt, r = batch
-    #     print(pcd.shape)
-    dst = PUNET_Dataset_Whole()
-    points, name = dst[0]
-    print(points, name)
+    dst = PUNET_Dataset()
+    for batch in dst:
+        pcd, gt, r = batch
+        print(pcd.shape)
+        import pdb
+        pdb.set_trace()
+    # dst = PUNET_Dataset_Whole()
+    # points, name = dst[0]
+    # print(points, name)

@@ -1,1 +1,1 @@
-from .chamfer_distance import ChamferDistance
+from .chamfer_distance import chamfer_distance

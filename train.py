@@ -1,51 +1,54 @@
-import torch
-import torch.nn as nn
-from torch.utils.data import DataLoader
-
-from pointnet2.pointnet2_utils import grouping_operation as group_point
-from utils import knn_point
-# from emd.emd import earth_mover_distance
-from chamfer_distance import ChamferDistance
-
-from model import PUNet
-from dataset import PUNET_Dataset
-
-import os
 import argparse
-import numpy as np
+import os
 
 parser = argparse.ArgumentParser(description="Arg parser")
 parser.add_argument('--gpu', type=int, default=0, help='GPU to use')
-parser.add_argument('--log_dir', default='logs/test_log', help='Log dir [default: logs/test_log]')
+parser.add_argument('--log_dir', default='logs/test_emd', help='Log dir [default: logs/test_log]')
 parser.add_argument('--npoint', type=int, default=1024,help='Point Number [1024/2048] [default: 1024]')
 parser.add_argument('--up_ratio',  type=int,  default=4, help='Upsampling Ratio [default: 4]')
 parser.add_argument('--max_epoch', type=int, default=100, help='Epochs to run [default: 100]')
-parser.add_argument('--batch_size', type=int, default=32, help='Batch Size during training')
+parser.add_argument('--batch_size', type=int, default=12, help='Batch Size during training')
 parser.add_argument('--lr', type=float, default=0.001)
 parser.add_argument('--workers', type=int, default=4)
 
 args = parser.parse_args()
-torch.cuda.set_device(args.gpu)
+os.environ["CUDA_VISIBLE_DEVICES"] = str(args.gpu)
+
+import torch
+import torch.nn as nn
+from torch.utils.data import DataLoader
+
+from pointnet2 import pointnet2_utils as pn2_utils
+from utils import knn_point
+from chamfer_distance import chamfer_distance
+from auction_match import auction_match
+
+from model import PUNet
+from dataset import PUNET_Dataset
+import numpy as np
 
 
 class UpsampleLoss(nn.Module):
-    def __init__(self, alpha=0.1, nn_size=5, radius=0.07, h=0.03, eps=1e-12):
+    def __init__(self, alpha=1.0, nn_size=5, radius=0.07, h=0.03, eps=1e-12):
         super().__init__()
         self.alpha = alpha
         self.nn_size = nn_size
         self.radius = radius
         self.h = h
         self.eps = eps
-        self.cd_loss = ChamferDistance()
 
     def get_emd_loss(self, pred, gt, pcd_radius):
-        dist = earth_mover_distance(pred, gt, transpose=False)
-        dist_norm = dist / pcd_radius
-        emd_loss = torch.mean(dist_norm)
-        return emd_loss
+        idx, _ = auction_match(pred, gt)
+        matched_out = pn2_utils.gather_operation(gt.transpose(1, 2).contiguous(), idx)
+        matched_out = matched_out.transpose(1, 2).contiguous()
+        dist2 = (pred - matched_out) ** 2
+        dist2 = dist2.view(dist2.shape[0], -1) # <-- ???
+        dist2 = torch.mean(dist2, dim=1, keepdims=True) # B,
+        dist2 /= pcd_radius
+        return torch.mean(dist2)
 
     def get_cd_loss(self, pred, gt, pcd_radius):
-        cost_for, cost_bac = self.cd_loss(gt, pred)
+        cost_for, cost_bac = chamfer_distance(gt, pred)
         cost = 0.8 * cost_for + 0.2 * cost_bac
         cost /= pcd_radius
         cost = torch.mean(cost)
@@ -56,7 +59,7 @@ class UpsampleLoss(nn.Module):
         idx = idx.transpose(1, 2).to(torch.int32)
         idx = idx[:, :, 1:] # remove first one
         idx = idx.contiguous()
-        grouped_points = group_point(pred, idx)
+        grouped_points = pn2_utils.grouping_operation(pred, idx)
 
         grouped_points = grouped_points - pred.unsqueeze(-1)
         dist2 = torch.sum(grouped_points ** 2, dim=1)
@@ -69,7 +72,7 @@ class UpsampleLoss(nn.Module):
         return uniform_loss
 
     def forward(self, pred, gt, pcd_radius):
-        return self.get_cd_loss(pred, gt, pcd_radius) \
+        return self.get_emd_loss(pred, gt, pcd_radius) * 100 \
              + self.alpha * self.get_repulsion_loss(pred)
 
 
@@ -80,7 +83,7 @@ if __name__ == '__main__':
                         shuffle=True, pin_memory=True, num_workers=args.workers)
 
     model = PUNet(npoint=args.npoint, up_ratio=args.up_ratio, 
-                use_normal=False, use_bn=True)
+                use_normal=False, use_bn=False)
     model.cuda()
     
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=5e-4)
