@@ -7,7 +7,7 @@ parser.add_argument('--log_dir', default='logs/test_emd', help='Log dir [default
 parser.add_argument('--npoint', type=int, default=1024,help='Point Number [1024/2048] [default: 1024]')
 parser.add_argument('--up_ratio',  type=int,  default=4, help='Upsampling Ratio [default: 4]')
 parser.add_argument('--max_epoch', type=int, default=100, help='Epochs to run [default: 100]')
-parser.add_argument('--batch_size', type=int, default=12, help='Batch Size during training')
+parser.add_argument('--batch_size', type=int, default=32, help='Batch Size during training')
 parser.add_argument('--lr', type=float, default=0.001)
 parser.add_argument('--workers', type=int, default=4)
 
