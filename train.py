@@ -8,6 +8,7 @@ parser.add_argument('--npoint', type=int, default=1024,help='Point Number [1024/
 parser.add_argument('--up_ratio',  type=int,  default=4, help='Upsampling Ratio [default: 4]')
 parser.add_argument('--max_epoch', type=int, default=100, help='Epochs to run [default: 100]')
 parser.add_argument('--batch_size', type=int, default=32, help='Batch Size during training')
+parser.add_argument("--use_bn", action='store_true', default=False)
 parser.add_argument('--lr', type=float, default=0.001)
 parser.add_argument('--workers', type=int, default=4)
 
@@ -55,11 +56,12 @@ class UpsampleLoss(nn.Module):
         return cost
 
     def get_repulsion_loss(self, pred):
-        _, idx = knn_point(self.nn_size, pred, pred)
-        idx = idx.transpose(1, 2).to(torch.int32)
-        idx = idx[:, :, 1:] # remove first one
-        idx = idx.contiguous()
-        grouped_points = pn2_utils.grouping_operation(pred, idx)
+        _, idx = knn_point(self.nn_size, pred, pred, transpose_mode=True)
+        idx = idx[:, :, 1:].to(torch.int32) # remove first one
+        idx = idx.contiguous() # B, N, nn
+
+        pred = pred.transpose(1, 2).contiguous() # B, 3, N
+        grouped_points = pn2_utils.grouping_operation(pred, idx) # (B, 3, N), (B, N, nn) => (B, 3, N, nn)
 
         grouped_points = grouped_points - pred.unsqueeze(-1)
         dist2 = torch.sum(grouped_points ** 2, dim=1)
@@ -72,8 +74,8 @@ class UpsampleLoss(nn.Module):
         return uniform_loss
 
     def forward(self, pred, gt, pcd_radius):
-        return self.get_emd_loss(pred, gt, pcd_radius) * 100 \
-             + self.alpha * self.get_repulsion_loss(pred)
+        return self.get_emd_loss(pred, gt, pcd_radius) * 100, \
+            self.alpha * self.get_repulsion_loss(pred)
 
 
 if __name__ == '__main__':
@@ -83,7 +85,7 @@ if __name__ == '__main__':
                         shuffle=True, pin_memory=True, num_workers=args.workers)
 
     model = PUNet(npoint=args.npoint, up_ratio=args.up_ratio, 
-                use_normal=False, use_bn=False)
+                use_normal=False, use_bn=args.use_bn)
     model.cuda()
     
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=5e-4)
@@ -92,6 +94,8 @@ if __name__ == '__main__':
     model.train()
     for epoch in range(args.max_epoch):
         loss_list = []
+        emd_loss_list = []
+        rep_loss_list = []
         for batch in train_loader:
             optimizer.zero_grad()
             input_data, gt_data, radius_data = batch
@@ -102,13 +106,17 @@ if __name__ == '__main__':
             radius_data = radius_data.float().cuda()
 
             preds = model(input_data)
-            loss = loss_func(preds, gt_data, radius_data)
+            emd_loss, rep_loss = loss_func(preds, gt_data, radius_data)
+            loss = emd_loss + rep_loss
 
             loss.backward()
             optimizer.step()
 
             loss_list.append(loss.item())
-        print(' -- epoch {}, loss {}.'.format(epoch, np.mean(loss_list)))
+            emd_loss_list.append(emd_loss.item())
+            rep_loss_list.append(rep_loss.item())
+        print(' -- epoch {}, loss {:.4f}, weighted emd loss {:.4f}, repulsion loss {:.4f}'.format(
+            epoch, np.mean(loss_list), np.mean(emd_loss_list), np.mean(rep_loss_list)))
         if (epoch + 1) % 20 == 0:
             state = {'epoch': epoch, 'model_state': model.state_dict()}
             save_path = os.path.join(args.log_dir, 'punet_epoch_{}.pth'.format(epoch))

@@ -1,8 +1,8 @@
 import numpy as np
 from knn_cuda import KNN
 
-def knn_point(group_size, point_cloud, query_cloud):
-    knn_obj = KNN(k=group_size, transpose_mode=False)
+def knn_point(group_size, point_cloud, query_cloud, transpose_mode=False):
+    knn_obj = KNN(k=group_size, transpose_mode=transpose_mode)
     dist, idx = knn_obj(point_cloud, query_cloud)
     return dist, idx
 
