@@ -60,7 +60,7 @@ class PointnetSAModuleMSG(_PointnetSAModuleBase):
     """Pointnet set abstraction layer with multiscale grouping"""
 
     def __init__(self, *, npoint: int, radii: List[float], nsamples: List[int], mlps: List[List[int]], bn: bool = True,
-                 use_xyz: bool = True, pool_method='max_pool', instance_norm=False):
+                 use_xyz: bool = True, use_res = False, pool_method='max_pool', instance_norm=False):
         """
         :param npoint: int
         :param radii: list of float, list of radii to group with
@@ -89,7 +89,10 @@ class PointnetSAModuleMSG(_PointnetSAModuleBase):
             if use_xyz:
                 mlp_spec[0] += 3
 
-            self.mlps.append(pt_utils.SharedMLP(mlp_spec, bn=bn, instance_norm=instance_norm))
+            if use_res:
+                self.mlps.append(pt_utils.SharedResMLP(mlp_spec, bn=bn))
+            else:
+                self.mlps.append(pt_utils.SharedMLP(mlp_spec, bn=bn, instance_norm=instance_norm))
         self.pool_method = pool_method
 
 
@@ -97,7 +100,7 @@ class PointnetSAModule(PointnetSAModuleMSG):
     """Pointnet set abstraction layer"""
 
     def __init__(self, *, mlp: List[int], npoint: int = None, radius: float = None, nsample: int = None,
-                 bn: bool = True, use_xyz: bool = True, pool_method='max_pool', instance_norm=False):
+                 bn: bool = True, use_xyz: bool = True, use_res = False, pool_method='max_pool', instance_norm=False):
         """
         :param mlp: list of int, spec of the pointnet before the global max_pool
         :param npoint: int, number of features
@@ -109,9 +112,16 @@ class PointnetSAModule(PointnetSAModuleMSG):
         :param instance_norm: whether to use instance_norm
         """
         super().__init__(
-            mlps=[mlp], npoint=npoint, radii=[radius], nsamples=[nsample], bn=bn, use_xyz=use_xyz,
+            mlps=[mlp], npoint=npoint, radii=[radius], nsamples=[nsample], bn=bn, use_xyz=use_xyz, use_res=use_res,
             pool_method=pool_method, instance_norm=instance_norm
         )
+
+
+class PointNetSSG_Base(PointnetSAModuleMSG):
+    def __init__(self, npoint, nsample, radius, in_channel, out_channel, bn=True, use_xyz=False):
+        super().__init__(
+            mlps=[[in_channel, out_channel, out_channel, out_channel]], 
+            npoint=npoint, radii=[radius], nsamples=[nsample], bn=bn, use_xyz=use_xyz, use_res=False)
 
 
 class PointnetFPModule(nn.Module):

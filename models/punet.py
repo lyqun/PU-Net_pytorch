@@ -3,8 +3,11 @@ import torch.nn as nn
 from pointnet2.pointnet2_modules import PointnetSAModule, PointnetFPModule
 import pointnet2.pytorch_utils as pt_utils
 
+def get_model(npoint=1024, up_ratio=2, use_normal=False, use_bn=False, use_res=False):
+    return PUNet(npoint, up_ratio, use_normal, use_bn, use_res)
+
 class PUNet(nn.Module):
-    def __init__(self, npoint=1024, up_ratio=2, use_normal=False, use_bn=False):
+    def __init__(self, npoint=1024, up_ratio=2, use_normal=False, use_bn=False, use_res=False):
         super().__init__()
 
         self.npoint = npoint
@@ -40,6 +43,7 @@ class PUNet(nn.Module):
                     nsample=nsamples[k],
                     mlp=[in_ch] + mlps[k],
                     use_xyz=True,
+                    use_res=use_res,
                     bn=use_bn))
             in_ch = mlps[k][-1]
 

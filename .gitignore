@@ -1,4 +1,5 @@
-datas/
+datas/test_data
+datas/*.h5
 logs/
 outputs/
 debug_outputs/

@@ -1,6 +1,46 @@
 import torch.nn as nn
 from typing import List, Tuple
+import torch.nn.functional as F
 
+class EmptyModule(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, x):
+        return x
+
+
+class SharedResMLP(nn.Module):
+    def __init__(
+            self,
+            args: List[int],
+            *,
+            bn: bool = False,
+            activation=nn.ReLU(inplace=True)):
+        super().__init__()
+
+        self.res_convs = nn.ModuleList()
+        self.short_conn = nn.ModuleList()
+        for i in range(len(args) - 1):
+            in_ch = args[i]
+            out_ch = args[i + 1]
+            mid_ch = args[i + 1] // 2
+            self.res_convs.append(
+                nn.Sequential(
+                    Conv2d(in_ch, mid_ch, bn=bn, activation=activation),
+                    Conv2d(mid_ch, mid_ch, bn=bn, activation=activation),
+                    Conv2d(mid_ch, out_ch, bn=bn, activation=None)))
+            self.short_conn.append(
+                EmptyModule() if in_ch == out_ch else \
+                Conv2d(in_ch, out_ch, bn=bn, activation=None))
+
+    def forward(self, x):
+        for k in range(len(self.res_convs)):
+            out_res = self.res_convs[k](x)
+            out_short = self.short_conn[k](x)
+            x = F.relu(out_res + out_short)
+        return x
+            
 
 class SharedMLP(nn.Sequential):
 
