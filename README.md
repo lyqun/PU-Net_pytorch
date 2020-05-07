@@ -13,13 +13,13 @@ python setup.py install
 
 ### 2. Data Preparation
 
-#### a. Training Data
+#### a. Prepare Patches
 
-Follow the official repo, download training patches in HDF5 format from [GoogleDrive](https://drive.google.com/file/d/1wMtNGvliK_pUTogfzMyrz57iDb_jSQR8/view?usp=sharing) and put it into `./datas/`.
+First, follow the official repo, download patches in HDF5 format from [GoogleDrive](https://drive.google.com/file/d/1wMtNGvliK_pUTogfzMyrz57iDb_jSQR8/view?usp=sharing) and put it into `./datas/`. Patches are splitted for training (3200) and testing (800). See `./datas/train_list.txt` and `./datas/test_list.txt`.
 
-#### b. Testing Data
+#### b. Prepare Datas for Visualization
 
-Testing mesh files can be downloaded from [GoogleDrive](https://drive.google.com/file/d/1R21MD1O6q8E7ANui8FR0MaABkKc30PG4/view?usp=sharing) and unzip it into `./datas/test_data/`.
+Full mesh object can be downloaded from the official repo, [link](https://github.com/yulequan/PU-Net/tree/master/data/test_data/our_collected_data/MC_5k). Put the full mesh datas into `./datas/test_data/our_collected_data/MC_5k`.
 
 ### 3. Train
 
@@ -27,12 +27,20 @@ Run the following commands for training.
 
 ```shell
 mkdir logs
-python train --gpu 0 --log_dir punet_baseline
+bash train_punet.sh
 ```
 
-### 4. Testing
+### 4. Evaluation
 
-Run the following commands for testing.
+Run the following commands for evaluation.
+
+```shell
+python eval.py --gpu 0 --resume logs/punet_baseline/punet_epoch_99.pth
+```
+
+### 5. Visualization
+
+Run the following commands to generate upsampled datas from full mesh objects with 5k points. Upsampled point clouds are saved in `./outputs/*.ply`.
 
 ```shell
 mkdir outputs
