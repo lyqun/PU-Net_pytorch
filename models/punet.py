@@ -75,8 +75,8 @@ class PUNet(nn.Module):
         if npoint is None:
             npoints = [None] * len(self.npoints)
         else:
-            npoints = [npoint]
-            for k in range(len(self.npoints) - 1):
+            npoints = []
+            for k in range(len(self.npoints)):
                 npoints.append(npoint // 2 ** k)
 
         ## points: bs, N, 3/6

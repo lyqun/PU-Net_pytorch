@@ -7,15 +7,17 @@ parser.add_argument("--model", type=str, default='punet')
 parser.add_argument('--up_ratio',  type=int,  default=4, help='Upsampling Ratio [default: 4]')
 parser.add_argument("--use_bn", action='store_true', default=False)
 parser.add_argument("--use_res", action='store_true', default=False)
+parser.add_argument("--save_dir", type=str, required=True)
 parser.add_argument('--resume', type=str, required=True)
 
 args = parser.parse_args()
+print(args)
 os.environ["CUDA_VISIBLE_DEVICES"] = str(args.gpu)
 
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
-from ply_utils import save_ply
+from utils.ply_utils import save_ply
 from utils.utils import save_xyz_file
 import numpy as np
 
@@ -44,7 +46,7 @@ if __name__ == '__main__':
         
         preds = preds.data.cpu().numpy()
         points = points.data.cpu().numpy()
-        save_ply('./outputs/{}_input.ply'.format(name), points[0, :, :3])
-        save_ply('./outputs/{}.ply'.format(name), preds[0])
-        save_xyz_file(preds[0], './outputs/{}.xyz'.format(name))
+        save_ply(os.path.join(args.save_dir, '{}_input.ply'.format(name)), points[0, :, :3])
+        save_ply(os.path.join(args.save_dir, '{}.ply'.format(name)), preds[0])
+        save_xyz_file(preds[0], os.path.join(args.save_dir, '{}.xyz'.format(name)))
         print('{} with shape {}, output shape {}'.format(name, points.shape, preds.shape))

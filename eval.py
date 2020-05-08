@@ -4,12 +4,15 @@ import os, sys
 parser = argparse.ArgumentParser(description="Arg parser")
 parser.add_argument('--gpu', type=int, default=0, help='GPU to use')
 parser.add_argument("--model", type=str, default='punet')
+parser.add_argument("--batch_size", type=int, default=8)
+parser.add_argument("--workers", type=int, default=4)
 parser.add_argument('--up_ratio',  type=int,  default=4, help='Upsampling Ratio [default: 4]')
 parser.add_argument("--use_bn", action='store_true', default=False)
 parser.add_argument("--use_res", action='store_true', default=False)
 parser.add_argument('--resume', type=str, required=True)
 
 args = parser.parse_args()
+print(args)
 os.environ["CUDA_VISIBLE_DEVICES"] = str(args.gpu)
 
 import torch
@@ -44,15 +47,15 @@ def get_cd_loss(pred, gt, pcd_radius):
 if __name__ == '__main__':
     MODEL = importlib.import_module('models.' + args.model)
     model = MODEL.get_model(npoint=1024, up_ratio=args.up_ratio, 
-                use_normal=False, use_bn=args.use_bn, use_res=args.use_res, split='test', is_training=False)
+                use_normal=False, use_bn=args.use_bn, use_res=args.use_res)
 
     checkpoint = torch.load(args.resume)
     model.load_state_dict(checkpoint['model_state'])
     model.eval().cuda()
 
-    eval_dst = PUNET_Dataset(h5_file_path='./datas/Patches_noHole_and_collected.h5', is_test=True)
-    eval_loader = DataLoader(eval_dst, batch_size=1, 
-                        shuffle=False, pin_memory=True, num_workers=0)
+    eval_dst = PUNET_Dataset(h5_file_path='./datas/Patches_noHole_and_collected.h5', split='test', is_training=False)
+    eval_loader = DataLoader(eval_dst, batch_size=args.batch_size, 
+                        shuffle=False, pin_memory=True, num_workers=args.workers)
 
     emd_list = []
     cd_list = []
@@ -62,7 +65,7 @@ if __name__ == '__main__':
             points = points[..., :3].float().cuda().contiguous()
             gt = gt[..., :3].float().cuda().contiguous()
             radius = radius.float().cuda()
-            preds = model(points, npoint=points.shape[1])
+            preds = model(points, npoint=None) #points.shape[1])
 
             emd = get_emd_loss(preds, gt, radius)
             cd = get_cd_loss(preds, gt, radius)

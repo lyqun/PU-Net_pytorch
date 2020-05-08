@@ -11,15 +11,18 @@ parser.add_argument('--max_epoch', type=int, default=100, help='Epochs to run [d
 parser.add_argument('--batch_size', type=int, default=32, help='Batch Size during training')
 parser.add_argument("--use_bn", action='store_true', default=False)
 parser.add_argument("--use_res", action='store_true', default=False)
+parser.add_argument("--alpha", type=float, default=1.0) # for repulsion loss
 parser.add_argument('--optim', type=str, default='adam')
+parser.add_argument('--use_decay', action='store_true', default=False)
 parser.add_argument('--lr', type=float, default=0.001)
-parser.add_argument('--lr_decay', type=float, default=0.1)
+parser.add_argument('--lr_decay', type=float, default=0.71)
 parser.add_argument('--lr_clip', type=float, default=0.000001)
-parser.add_argument('--decay_step_list', type=list, default=[50, 100, 150])
+parser.add_argument('--decay_step_list', type=list, default=[30, 60])
 parser.add_argument('--weight_decay', type=float, default=0.0005)
 parser.add_argument('--workers', type=int, default=4)
 
 args = parser.parse_args()
+print(args)
 os.environ["CUDA_VISIBLE_DEVICES"] = str(args.gpu)
 
 import torch
@@ -86,15 +89,17 @@ class UpsampleLoss(nn.Module):
 
 def get_optimizer():
     if args.optim == 'adam':
-        optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=5e-4)
-        return optimizer, None
+        optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     elif args.optim == 'sgd':
         optimizer = torch.optim.SGD(model.parameters(), 
                                 lr=args.lr, 
                                 momentum=0.98, 
                                 weight_decay=args.weight_decay, 
                                 nesterov=True)
-        
+    else:
+        raise NotImplementedError
+    
+    if args.use_decay:
         def lr_lbmd(cur_epoch):
             cur_decay = 1
             for decay_step in args.decay_step_list:
@@ -104,7 +109,7 @@ def get_optimizer():
         lr_scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lbmd)
         return optimizer, lr_scheduler
     else:
-        raise NotImplementedError
+        return optimizer, None
 
 
 if __name__ == '__main__':
@@ -119,7 +124,7 @@ if __name__ == '__main__':
     model.cuda()
     
     optimizer, lr_scheduler = get_optimizer()
-    loss_func = UpsampleLoss()
+    loss_func = UpsampleLoss(alpha=args.alpha)
 
     model.train()
     for epoch in range(args.max_epoch):

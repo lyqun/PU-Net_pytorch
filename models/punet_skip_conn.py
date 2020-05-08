@@ -1,13 +1,12 @@
 import torch
 import torch.nn as nn
-from pointnet2.pointnet2_modules import PointNetSSG_Base, PointnetSAModule, PointnetFPModule
+from pointnet2.pointnet2_modules import PointnetSAModule, PointnetFPModule
 import pointnet2.pytorch_utils as pt_utils
-from models.base import Resnet_BaseBlock
 
 def get_model(npoint=1024, up_ratio=2, use_normal=False, use_bn=False, use_res=False):
-    return PUNetRes(npoint, up_ratio, use_normal, use_bn, use_res)
+    return PUNet(npoint, up_ratio, use_normal, use_bn, use_res)
 
-class PUNetRes(nn.Module):
+class PUNet(nn.Module):
     def __init__(self, npoint=1024, up_ratio=2, use_normal=False, use_bn=False, use_res=False):
         super().__init__()
 
@@ -22,42 +21,38 @@ class PUNetRes(nn.Module):
             npoint // 8
         ]
 
-        mlps = [64, 128, 256, 512]
+        mlps = [
+            [32, 32, 64],
+            [64, 64, 128],
+            [128, 128, 256],
+            [256, 256, 512]
+        ]
 
         radius = [0.05, 0.1, 0.2, 0.3]
 
         nsamples = [32, 32, 32, 32]
 
-        in_ch = 0 if not use_normal else 3
-        self.conv0 = PointnetSAModule(
-            npoint=self.npoints[0],
-            radius=radius[0],
-            nsample=nsamples[0],
-            mlp=[in_ch, 32],
-            use_xyz=True)
-        in_ch = 32
-
         ## for 4 downsample layers
+        in_ch = 0 if not use_normal else 3
         self.SA_modules = nn.ModuleList()
         for k in range(len(self.npoints)):
             self.SA_modules.append(
-                Resnet_BaseBlock(
-                    PNCONV=PointNetSSG_Base,
-                    npoint=self.npoints[k], 
-                    nsample=nsamples[k], 
-                    radius=radius[k], 
-                    in_channel=in_ch, 
-                    out_channel=mlps[k], 
-                    bn=use_bn, 
-                    use_xyz=True))
-            in_ch = mlps[k]
+                PointnetSAModule(
+                    npoint=self.npoints[k],
+                    radius=radius[k],
+                    nsample=nsamples[k],
+                    mlp=[in_ch] + mlps[k],
+                    use_xyz=True,
+                    use_res=use_res,
+                    bn=use_bn))
+            in_ch = mlps[k][-1]
 
         ## upsamples for layer 2 ~ 4
         self.FP_Modules = nn.ModuleList()
         for k in range(len(self.npoints) - 1):
             self.FP_Modules.append(
                 PointnetFPModule(
-                    mlp=[mlps[k + 1], 64], 
+                    mlp=[mlps[k + 1][-1] + 64, 64], 
                     bn=use_bn))
         
         ## feature Expansion
@@ -88,7 +83,6 @@ class PUNetRes(nn.Module):
         xyz = points[..., :3].contiguous()
         feats = points[..., 3:].transpose(1, 2).contiguous() \
             if self.use_normal else None
-        xyz, feats = self.conv0(xyz, feats, npoint=npoints[0])
 
         ## downsample
         l_xyz, l_feats = [xyz], [feats]
@@ -100,7 +94,7 @@ class PUNetRes(nn.Module):
         ## upsample
         up_feats = []
         for k in range(len(self.FP_Modules)):
-            upk_feats = self.FP_Modules[k](xyz, l_xyz[k + 2], None, l_feats[k + 2])
+            upk_feats = self.FP_Modules[k](xyz, l_xyz[k + 2], l_feats[1], l_feats[k + 2])
             up_feats.append(upk_feats)
 
         ## aggregation

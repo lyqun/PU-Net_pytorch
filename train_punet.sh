@@ -1,6 +1,6 @@
 gpu=0
 model=punet
-extra_tag=baseline
+extra_tag=punet_baseline
 
 mkdir logs/${extra_tag}
 
