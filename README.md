@@ -11,6 +11,13 @@ cd pointnet2
 python setup.py install
 ```
 
+You should install `knn_cuda` by running the following command or refering to [KNN_CUDA](https://github.com/unlimblue/KNN_CUDA)
+
+```
+pip install --upgrade https://github.com/unlimblue/KNN_CUDA/releases/download/0.2/KNN_CUDA-0.2-py3-none-any.whl
+```
+
+
 ### 2. Data Preparation
 
 #### a. Prepare Patches
@@ -94,3 +101,6 @@ bash test_punet.sh
    ```
 
 Note that, the disk size (D) is 40 in default setting.
+
+### Performance
+Please refer to this [issue#1](https://github.com/lyqun/PU-Net_pytorch/issues/1). I will update later.
