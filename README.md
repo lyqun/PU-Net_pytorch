@@ -104,3 +104,7 @@ Note that, the disk size (D) is 40 in default setting.
 
 ### Performance
 Please refer to this [issue#1](https://github.com/lyqun/PU-Net_pytorch/issues/1). I will update later.
+
+### Update
+1. The auction matching is modified from [PU-Net/code/tp_ops/emd](https://github.com/yulequan/PU-Net/tree/master/code/tf_ops/emd). The number of points should be fewer than 4096 and better chosen as $2^K$ (e.g., 1024, 4096).
+2. For the calculation of CD and EMD (evaluation), you should take the square root of the distance to get correct evaluation results.
